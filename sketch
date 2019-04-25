@@ -1,0 +1,191 @@
+#include <Arm7Bot.h>
+#include <ForceFilter.h>
+#include <MedianFilter.h>
+#include <PVector.h>
+#include <PressFilter.h>
+#include <errno.h>
+Arm7Bot Arm;
+
+char *strtokIndx;
+const byte numChars = 64;
+char receivedChars[numChars]; // an array to store the received data
+
+boolean newData = false;
+
+static byte ndx = 0;
+char endMarker = '\n';
+char rc;
+
+int J0 = 0;
+bool J0_ok = false;
+int J1 = 0;
+bool J1_ok = false;
+int J2 = 0;
+bool J2_ok = false;
+int J3 = 0;
+bool J3_ok = false;
+int J4 = 0;
+bool J4_ok = false;
+int J5 = 0;
+bool J5_ok = false;
+int J6 = 0;
+bool J6_ok = false;
+
+void setup() {
+  Arm.initialMove();
+
+  // sloooowwww
+  Arm.maxSpeed[0] = 15;
+  Arm.maxSpeed[1] = 20;
+  Arm.maxSpeed[2] = 20;
+  Arm.maxSpeed[3] = 30;
+  Arm.maxSpeed[4] = 30;
+  Arm.maxSpeed[5] = 30;
+  Arm.maxSpeed[6] = 30;
+
+  Serial.begin(9600);
+  Serial.println("robot is ready");
+}
+
+void loop() {
+
+  while (Serial.available() > 0 && newData == false) {
+    rc = Serial.read();
+
+    if (rc != endMarker) {
+      receivedChars[ndx] = rc;
+      ndx++;
+      if (ndx >= numChars) {
+        ndx = numChars - 1;
+      }
+    } else {
+      receivedChars[ndx] = '\0'; // terminate the string
+      ndx = 0;
+      newData = true;
+    }
+  }
+
+  if (newData == true) {
+    Serial.print("received: ");
+    Serial.println(receivedChars);
+
+    // split the data into its parts
+    strtokIndx = strtok(receivedChars, ",");
+    J0_ok = int32_extractor(strtokIndx, &J0);
+    if (!J0_ok) {
+      Serial.println("sorry, J0 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J1_ok = int32_extractor(strtokIndx, &J1);
+    if (!J1_ok) {
+      Serial.println("sorry, J1 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J2_ok = int32_extractor(strtokIndx, &J2);
+    if (!J2_ok) {
+      Serial.println("sorry, J2 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J3_ok = int32_extractor(strtokIndx, &J3);
+    if (!J3_ok) {
+      Serial.println("sorry, J3 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J4_ok = int32_extractor(strtokIndx, &J4);
+    if (!J4_ok) {
+      Serial.println("sorry, J4 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J5_ok = int32_extractor(strtokIndx, &J5);
+    if (!J5_ok) {
+      Serial.println("sorry, J5 is NOT ok");
+      goto done;
+    }
+    strtokIndx = strtok(NULL, ",");
+    J6_ok = int32_extractor(strtokIndx, &J6);
+    if (!J6_ok) {
+      Serial.println("sorry, J6 is NOT ok");
+      goto done;
+    }
+
+    Serial.print("J0 ");
+    Serial.println(J0);
+    Serial.print("J1 ");
+    Serial.println(J1);
+    Serial.print("J2 ");
+    Serial.println(J2);
+    Serial.print("J3 ");
+    Serial.println(J3);
+    Serial.print("J4 ");
+    Serial.println(J4);
+    Serial.print("J5 ");
+    Serial.println(J5);
+    Serial.print("J6 ");
+    Serial.println(J6);
+
+    double angles_1[SERVO_NUM];
+    angles_1[0] = (double)J0;
+    angles_1[1] = (double)J1;
+    angles_1[2] = (double)J2;
+    angles_1[3] = (double)J3;
+    angles_1[4] = (double)J4;
+    angles_1[5] = (double)J5;
+    angles_1[6] = (double)J6;
+    Arm.move(angles_1);
+
+  done:
+
+    newData = false;
+  }
+
+  // // set motor[0] speed to 100
+  // Arm.maxSpeed[0] = 100;
+  // // Move to pose 1
+  // double angles_1[SERVO_NUM] =  {70, 115, 65, 90, 90, 90, 75};
+  // Arm.move(angles_1);
+  // // Move to pose 2
+  // double angles_2[SERVO_NUM] =  {110, 115, 65, 90, 90, 90, 75};
+  // Arm.move(angles_2);
+
+  // // change speed to 30
+  // Arm.maxSpeed[0] = 30;
+  // // Move to pose 3
+  // double angles_3[SERVO_NUM] =  {70, 135, 65, 90, 90, 90, 75};
+  // Arm.move(angles_3);
+  // // Move to pose 4
+  // double angles_4[SERVO_NUM] =  {110, 135, 65, 90, 90, 90, 75};
+  // Arm.move(angles_4);
+}
+
+/*
+int32_extractor() is a wrapper around strtol,
+it is based around code provided from here:
+http://www.microhowto.info/howto/safely_parse_an_integer_using_the_standard_c_library.html
+NOTE: This function will not parse a float, but will return false
+*/
+bool int32_extractor(const char *input, int *output) {
+  if (input == NULL) {
+    return false;
+  }
+
+  // Strtol treats an empty string as a valid input
+  if (input[0] == '\0') {
+    return false;
+  }
+
+  errno = 0;
+  char *end = (char *)input;
+  *output = strtol(input, &end, 10);
+  if (errno != 0) {
+    return false;
+  } else if (*end) {
+    return false;
+  } else {
+    return true;
+  }
+}
